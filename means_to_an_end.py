@@ -1,4 +1,5 @@
 import struct
+import time
 import socket
 import threading
 
@@ -29,8 +30,7 @@ def get_bit_val(data: bytearray) -> int:
         for b in range(8):
             bit = byte >> (7 - b) & 1
             bits += str(bit)
-    print(f"bits: {bits}  length: {len(bits)}")
-
+    # print(f"~~The len of Price Data: {len(PRICE_DATA)}")
     ln = len(bits)
     for i in range(len(bits)):
         if bits[i] == "1":
@@ -55,40 +55,53 @@ def get_bit_val(data: bytearray) -> int:
 def mean_Query(minitime: int, maxtime: int) -> int:
     count = 0
     val = 0
+    if minitime == maxtime:
+        return (PRICE_DATA[minitime]/1)
+
     try:
         for key in PRICE_DATA:
             if key >= minitime and key <= maxtime:
                 count += 1
                 val += PRICE_DATA[key]
-                print(f"coutn{count} val {val}")
 
+        num = round(val/count)
     except ZeroDivisionError:
         raise ZeroDivisionError
 
-    num = round(val / count)
+    # num = round(val / count)
+    print("********************************\n**************Total num for mean: ",num)
     return num
 
 
 def handle_client(con: socket.socket, addr):
     data = bytearray()
-    while True:
-        msg = con.recv(1024)
-        if not msg:
-            break
-        data += msg
-        print("Received Data ", data)
+    total_case = 0
+    try: 
+        while True:
+            msg = con.recv(1024)
+            if not msg:
+                break
+            data += msg
+            # print("Received Data ", data)
 
-        while len(data) >= 9:
-            first_byte = data[0]
-            pair1 = data[1:5]
-            pair2 = data[5:9]
-            print(f"first_byte: {first_byte}")
-            print(f"pair_1: {pair1}")
-            print(f"pair_2: {pair2}")
-            data = data[9:]
+            while len(data) >= 9:
+                if len(data) <9:
+                    print(f"Data is Not complete for process:   ")
+                    continue
+                first_byte = data[0]
+                pair1 = data[1:5]
+                pair2 = data[5:9]
+                # print(f"first_byte: {first_byte}")
+                # print(f"pair_1: {pair1}")
+                # print(f"pair_2: {pair2}")
+                data = data[9:]
+                print(f"Remainig Data:--------   {data}")
 
-            msg_type = chr(first_byte)
-            try:
+                msg_type = chr(first_byte)
+                total_case += 1
+                if msg_type not in ['I' , 'Q']:
+                    print("Invalid message Type .... Ignoring ")
+                    continue
                 if msg_type == "I":
                     print("Insert Message Received!")
                     timestamp = get_bit_val(pair1)
@@ -99,14 +112,15 @@ def handle_client(con: socket.socket, addr):
 
                     else:
                         print("Duplicate Timestamp Occur , Ignoring Message! ")
-                    print(f"The Loan price DATA: {PRICE_DATA}")
 
+
+                    print("*************~~~~~~~~~~~:  " , total_case)
                 elif msg_type == "Q":
                     print("Query Message Received!")
-                    print()
                     mintime = get_bit_val(pair1)
                     maxtime = get_bit_val(pair2)
                     print(f"Mintime: {mintime} ,  Maxtime: {maxtime}")
+
                     if mintime >= maxtime:
                         print(
                             "Invalid query: Mintime is greater than or equal to Maxtime."
@@ -121,21 +135,21 @@ def handle_client(con: socket.socket, addr):
                         con.sendall(struct.pack(">I", 0))
 
                     else:
-                        print("****************", query_val)
-                        print(f"~~~~~~~    {bytearray(struct.pack('>I',query_val))}")
+                        # print(f"~~~~~~~    {bytearray(struct.pack('>I',query_val))}")
                         con.sendall(bytearray(struct.pack(">I", query_val)))
-                        print("###################################################")
 
+                    print("*************~~~~~~~~~~~:  " , total_case)
 
                 else:
                     print("Invalid Message type!")
                     break
 
-            except ValueError as e:
-                print(f"ValueError {e}")
-    print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-    con.shutdown(socket.SHUT_RDWR)
-    con.close()
+            if len(data) >0 and len(data)<9:
+                print(f"incomplete data from {addr} , waiting for new data.....")
+    except Exception as e:
+            print(f"error handling cient {addr}: {e}")
+    finally:
+        con.close()
 
 
 def start_server(SERVER_IP="0.0.0.0", SERVER_PORT=1672):
@@ -147,13 +161,10 @@ def start_server(SERVER_IP="0.0.0.0", SERVER_PORT=1672):
             try:
                 con, addr = s.accept()
                 print(f"connecting address {addr}")
-                thread = threading.Thread(
-                    target=handle_client, args=(con, addr)
-                ).start()
+                threading.Thread(target=handle_client, args=(con, addr)).start()
             except KeyboardInterrupt:
                 print("Shutdown Server")
-            finally:
-                s.close()
+                break
 
 
 if __name__ == "__main__":
