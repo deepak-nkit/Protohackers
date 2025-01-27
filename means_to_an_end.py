@@ -22,8 +22,8 @@ def get_bit_val(data: bytearray) -> int:
     ln = len(bits)
     is_neg = bits[0] == "1"
     for i in range(len(bits)):
-        # if is_neg and i == 0:
-        #     val -= 2 ** (ln - 1)
+        if is_neg and i == 0:
+            val -= 2 ** 32
         if bits[i] == "1":
             val += 2 ** (ln - 1 - i)
 
@@ -44,9 +44,7 @@ def mean_Query(minitime: int, maxtime: int) -> int:
     total_sum = sum(sorted_data.values())
     total_count = len(sorted_data)
     with open("query.txt", "a") as f:
-        f.write(f"Query range: {minitime} to {maxtime}\n")
-        for timestamp, value in sorted_data.items():
-            f.write(f"Timestamp: {timestamp}, Value: {value}\n")
+        f.write(f"Query range: {minitime} to {maxtime} len of data {len(sorted_data)}\n")
         f.write(str(round(total_sum/total_count)))
         f.write("\n")
     return round(total_sum / total_count)
@@ -88,10 +86,6 @@ def handle_client(con: socket.socket, addr):
                     if timestamp not in PRICE_DATA:
                         PRICE_DATA[timestamp] = value
 
-                    if timestamp < 0:
-                        print("timestamp: ", timestamp)
-                        time.sleep(10)
-
                     else:
                         print("Duplicate Timestamp Occur , Ignoring Message! ")
                         continue
@@ -113,10 +107,11 @@ def handle_client(con: socket.socket, addr):
                         con.sendall(struct.pack(">I", 0))
 
                     else:
-                        print("value from qurey : ",bytearray(struct.pack(">I", query_val)))
-                        con.sendall(bytearray(struct.pack(">I", query_val)))
+                        print("############")
+                        print("value from qurey : ",bytearray(struct.pack(">i", query_val)))
+                        con.sendall(bytearray(struct.pack(">i", query_val)))
                         with open("data.csv", "w") as f:
-                            f.write(str(bytearray(struct.pack(">I", query_val))))
+                            f.write(str(bytearray(struct.pack(">i", query_val))))
 
                 else:
                     print("Invalid Message type!")
