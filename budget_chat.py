@@ -4,7 +4,7 @@ ACTIVE_MEMBERS = {}
 
 
 def set_Member(username: str):
-    if not username or not re.match(r"^[a-z A-Z0-9]+$", username):
+    if not username or not re.match(r"^[a-zA-Z0-9]+$", username):
         return False
     elif len(username) < 1 or len(username) > 16:
         return False
@@ -14,7 +14,7 @@ def set_Member(username: str):
 def broadCast_message(message: str, username: str):
     for user, sock in ACTIVE_MEMBERS.items():
         if user != username:
-            sock.senall(message.encode("ASCII"))
+            sock.sendall(message.encode("ASCII"))
 
 
 def handle_client(conn: socket.socket, addr):
@@ -23,7 +23,7 @@ def handle_client(conn: socket.socket, addr):
     username = None
 
     try:
-        msg = conn.recv(1024).decode("ASCII")
+        msg = conn.recv(1024).decode("ASCII").strip()
 
         if not set_Member(msg):
             conn.sendall(b"Invalid Usernmae! Use only Characters and numbers")
@@ -36,43 +36,46 @@ def handle_client(conn: socket.socket, addr):
 
         username = msg
         ACTIVE_MEMBERS[username] = conn
-        print(ACTIVE_MEMBERS)
-        print(f"{username} has joined from {addr}")
+        # print(ACTIVE_MEMBERS)
+        print(f" {username} has joined from {addr}")
+
+        # Announce member names:
+        presented_user = ", ".join(user for user in ACTIVE_MEMBERS.keys() if user != username)
+        members_names = f"* The room contains: {presented_user}\n"
+        print(f"~~~\t~~: The User {username} -----  the announcement member {presented_user}\n ")
+        conn.sendall(members_names.encode("utf-8"))
 
         # Presence notification:
-        presented_user = ", ".join(user for user in ACTIVE_MEMBERS.keys())
-        join_msg = f"*{username} has entered the room"
+        join_msg = f"* {username} has entered the room"
         broadCast_message(join_msg, username)
-
-        #Announce member names:
-        m = (f"* The room contains: {presented_user}")
-        conn.sendall(m.encode('ascii'))
-
 
 
         # Handle message:
         data = ""
         while True:
+
             msg = conn.recv(1024)
             if not msg:
-                exit()
-            data += msg.decode("UTF-8")
+                break
+            data += msg.decode("UTF-8").strip()
             print(f"Data: {data}")
             while "\n" in data:
                 end = data.index("\n")
                 req_data = data[:end]
                 data = data[end + 1 :]
                 sender_message = f"[{username}] {req_data}"
-                broadCast_message(sender_message , username)
+                print(sender_message)
+                broadCast_message(sender_message, username)
 
     except Exception as e:
         print(f"{username} has disconnected.")
 
         # Remove User and Notify others:
     finally:
+        print("In Final Block")
         if username in ACTIVE_MEMBERS:
             del ACTIVE_MEMBERS[username]
-            broadCast_message("f* {username} has left the chat", username)
+            broadCast_message(f"* {username} has left the chat", username)
 
         conn.close()
         print(f"Connection Closed for {username}")
